@@ -27,24 +27,24 @@ type Migration struct {
 func ApplyMigration(db *sql.DB, migration Migration) error {
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("Failed to begin transction")
+		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(migration.SQL)
 	if err != nil {
-		return fmt.Errorf("Failed to execute migration")
+		return fmt.Errorf("exec migration %s: %w", migration.Filename, err)
 	}
 
 	// Insert into schema
 	_, err = tx.Exec(insertMigration, migration.Version)
 	if err != nil {
-		return fmt.Errorf("Failed to record migration")
+		return fmt.Errorf("record migration %s: %w", migration.Filename, err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return fmt.Errorf("Failed to commit transaction")
+		return fmt.Errorf("commit tx: %w", err)
 	}
 
 	return nil
@@ -65,14 +65,15 @@ func LoadMigrations() ([]Migration, error) {
 			}
 
 			filename := d.Name()
-			parts := strings.Split(filename, "_")
+			parts := strings.SplitN(filename, "_", 2)
 			if len(parts) != 2 {
-				return fmt.Errorf("Invalid name: %s", filename)
+				return fmt.Errorf("invalid migration filename (expected <version>_<name>.sql): %s", filename)
 			}
 
 			content, err := os.ReadFile(path)
 			if err != nil {
-				return fmt.Errorf("failed to read migration file %s: %w", path, err)
+				return fmt.Errorf("failed to read migration file %s: %w",
+					path, err)
 			}
 
 			version := parts[0]
@@ -102,7 +103,7 @@ func LoadMigrations() ([]Migration, error) {
 func GetAppliedMigrations(db *sql.DB) (map[string]time.Time, error) {
 	rows, err := db.Query(getMigrations)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to fetch migrations from DB, %w", err)
+		return nil, fmt.Errorf("fetch applied migrations: %w", err)
 	}
 	defer rows.Close()
 
@@ -127,22 +128,24 @@ func AcquireAdvisoryLock(db *sql.DB, lockID int64) error {
 	err := db.QueryRow("SELECT pg_try_advisory_lock($1)", lockID).
 		Scan(&acquired)
 	if err != nil {
-		return fmt.Errorf("Failed to acquire lock: %w", err)
+		return fmt.Errorf("try advisory lock %d: %w", lockID, err)
 	}
 
 	if !acquired {
-		return fmt.Errorf("Failed to acquire lock, it may be in use.")
+		return fmt.Errorf("advisory lock %d is already held", lockID)
 	}
 
 	return nil
 }
 
 func ReleaseAdvisoryLock(db *sql.DB, lockID int64) error {
-	_, err := db.Exec("SELECT pg_advisory_unlock($1)", lockID)
-	if err != nil {
-		return fmt.Errorf("Failed to release lock: %w", err)
+	var released bool
+	if err := db.QueryRow("SELECT pg_advisory_unlock($1)", lockID).Scan(&released); err != nil {
+		return fmt.Errorf("release advisory lock %d: %w", lockID, err)
 	}
-
+	if !released {
+		return fmt.Errorf("advisory lock %d was not held", lockID)
+	}
 	return nil
 }
 
@@ -152,41 +155,24 @@ var insertMigration string
 //go:embed get_migrations.sql
 var getMigrations string
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	databaseUrl := os.Getenv("DATABASE_URL")
-
-	db, err := sql.Open("pgx", databaseUrl)
-	if err != nil {
-		log.Fatal("Failed to connect to DB")
-	}
-	defer db.Close()
-
-	if err := db.Ping(); err != nil {
-		log.Fatal("Failed to ping database:", err)
-	}
-
+func Run(db *sql.DB) error {
 	// Lock
 	lockID := int64(42069)
 	if err := AcquireAdvisoryLock(db, lockID); err != nil {
-		log.Fatalf("failed to acquire migration lock: %v", err)
+		return fmt.Errorf("acquire migration lock: %w", err)
 	}
 	defer ReleaseAdvisoryLock(db, lockID)
 
 	// Load migration files
 	migrations, err := LoadMigrations()
 	if err != nil {
-		log.Fatal("Failed to load migration files.")
+		return fmt.Errorf("load migrations: %w", err)
 	}
 
 	// Get applied migrations
 	appliedMigrations, err := GetAppliedMigrations(db)
 	if err != nil {
-		log.Fatalf("Failed to get applied migrations: %v", err)
+		return fmt.Errorf("get applied migrations: %w", err)
 	}
 
 	// Apply pending migrations
@@ -201,10 +187,36 @@ func main() {
 		log.Printf("Applying migration %s (%s)...",
 			migration.Version, migration.Name)
 		if err := ApplyMigration(db, migration); err != nil {
-			log.Fatalf("Failed to apply migration: %s, %v",
+			return fmt.Errorf("apply migration %s: %w",
 				migration.Filename, err)
 		}
 		log.Printf("Successfully applied migration %s (%s)...",
 			migration.Version, migration.Name)
+	}
+
+	return nil
+}
+
+func main() {
+	_ = godotenv.Load()
+
+	databaseUrl := os.Getenv("DATABASE_URL")
+	if databaseUrl == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+
+	db, err := sql.Open("pgx", databaseUrl)
+	if err != nil {
+		log.Fatalf("Failed to connect to DB: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	err = Run(db)
+	if err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
 	}
 }

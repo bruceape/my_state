@@ -14,26 +14,27 @@ import (
 var addMigrationsTable string
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	// Make .env optional; ignore missing file
+	_ = godotenv.Load()
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
 	}
 
-	databaseUrl := os.Getenv("DATABASE_URL")
-
-	db, err := sql.Open("pgx", databaseUrl)
+	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
-		log.Fatal("Failed to connect to DB")
+		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatal("Failed to ping database:", err)
+		log.Fatalf("Failed to ping database: %v", err)
 	}
 
 	log.Println("Adding migrations table")
 	_, err = db.Exec(addMigrationsTable)
 	if err != nil {
-		log.Fatalf("Failed to add migration table. %v", err)
+		log.Fatalf("Failed to create schema_migrations table: %v", err)
 	}
 }
