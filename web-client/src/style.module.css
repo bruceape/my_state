@@ -1,0 +1,334 @@
+:root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+
+    /*   color-scheme: light dark; */
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    /* background-color: #FFF8E7; */
+}
+
+.morningMessage {
+    font-size: 64px;
+    letter-spacing: -3px;
+    font-family: "IBM Plex Serif", sans-serif;
+    /* font-family: "IBM Plex Serif", serif; */
+    font-optical-sizing: auto;
+}
+
+.morningMessage span {
+    transform: translateY(100%);
+    opacity: 0;
+    animation:
+        bottomUp 2s forwards,
+        fadeIn 1s forwards;
+    display: inline-block;
+}
+
+.intentMessage {
+    font-size: 64px;
+    letter-spacing: -3px;
+    font-family: "IBM Plex Serif", sans-serif;
+    /* font-family: "IBM Plex Serif", serif; */
+
+    font-optical-sizing: auto;
+}
+
+.intentMessage span {
+    transform: translateY(100%);
+    opacity: 0;
+    animation:
+        bottomUp 2s forwards,
+        fadeIn 1s forwards;
+    display: inline-block;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes bottomUp {
+    0% {
+        transform: translateY(100%);
+        filter: blur(24px);
+    }
+
+    100% {
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+.mainMessage {
+    padding: 20px 20px 48px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    align-items: flex-start;
+    max-width: 640px;
+    width: 100%;
+}
+
+.buttonCtl {
+    all: unset;
+    display: flex;
+    /*transform: translateY(100%);*/
+    opacity: 0;
+    /*animation: bottomUp 1s 4.2s forwards, fadeIn 0.5s 4.5s forwards;*/
+    animation: fadeIn 0.5s 4.5s forwards;
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 18px;
+    /* height: 24px; */
+    align-items: center;
+    transition:
+        all 400ms ease,
+        color 100ms ease;
+    font-family: "IBM Plex Sans", sans-serif;
+}
+
+.buttonCtl:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.buttonCtl:active {
+    /*color: rgba(0, 0, 0, 0.4);*/
+    transform: scale(0.94);
+}
+
+.wrapper {
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    transition: all 1.618s ease;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+}
+
+.wrapperHide {
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transform: scale(0.618) translateY(-38.2%);
+    filter: blur(40px);
+}
+
+.wrapperHideForward {
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transform: scale(1.618) translateY(38.2%);
+    filter: blur(40px);
+}
+
+.backButtonWrapper {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 9999;
+}
+
+.backButton {
+    all: unset;
+    display: flex;
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 18px;
+    align-items: center;
+    transition: all 618ms ease;
+    font-family: "IBM Plex Sans", sans-serif;
+    cursor: pointer;
+    opacity: 0.8;
+    transform: translateX(0);
+}
+
+.backButton:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    opacity: 1;
+}
+
+.backButton:active {
+    transform: scale(0.94);
+}
+
+.backButtonHidden {
+    opacity: 0;
+    transform: translateX(-50%);
+    pointer-events: none;
+    filter: blur(24px);
+}
+
+.backButtonVisible {
+    opacity: 0.8;
+    transform: translateX(0);
+    filter: blur(0);
+}
+
+.textarea {
+    /* Minimum height of 2 lines */
+    /* Maximum height of 10 lines */
+    /* display: flex; */
+    align-items: center;
+    line-height: 32px;
+    /* border-radius: 6px; */
+    width: 100%;
+    overflow-y: auto;
+    font-family: "IBM Plex Serif", sans-serif;
+    font-size: 24px;
+    padding: 8px;
+}
+
+/* .textarea::after { */
+/*   content: ""; */
+/*   display: block; */
+/*   position: absolute; */
+/*   bottom: 0; */
+/*   left: 0; */
+/*   right: 0; */
+/*   border-bottom: 1px solid rgba(0,0,0,0.16); */
+/* } */
+
+.entryWrapper:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.textarea:focus {
+    /* background-color: rgba(0, 0, 0, 0.1); */
+    outline: none;
+}
+.queryWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.query {
+    font-size: 40px;
+    line-height: 48px;
+    letter-spacing: -2px;
+    font-family: "IBM Plex Serif", sans-serif;
+    /* font-family: "IBM Plex Serif", serif; */
+    font-optical-sizing: auto;
+    padding: 0 12px;
+}
+
+.query span {
+    transform: translateY(100%);
+    opacity: 0;
+    animation:
+        bottomUp 2s forwards,
+        fadeIn 1s forwards;
+    display: inline-block;
+}
+
+.entryWrapper {
+    /* padding-top: 8px; */
+    display: flex;
+    width: 100%;
+    position: relative;
+    min-height: 1lh;
+    opacity: 0;
+    padding: 8px 8px;
+    /* max-height: 20lh; */
+    transform: translateY(100%);
+    background-color: rgba(0, 0, 0, 0.04);
+    animation:
+        bottomUp 1s var(--entry-delay, 3s) forwards,
+        fadeIn 0.5s var(--entry-fade-delay, 3.5s) forwards;
+    border-radius: 14px;
+}
+
+/* .continueBtn { */
+/*   position: absolute; */
+/*   right: 8px; */
+/*   top: 50%; */
+/*   transform: translateY(-50%); */
+/* } */
+.continueBtn {
+    all: unset;
+    display: flex;
+    /* background-color: rgba(0, 0, 0, 0.04); */
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 18px;
+    /* height: 24px; */
+    align-items: center;
+    transition:
+        all 400ms ease,
+        color 100ms ease;
+    font-family: "IBM Plex Sans", sans-serif;
+    /* position: absolute; */
+    /* top: 8px; */
+    /* right: 8px; */
+    /* bottom: 8px; */
+}
+
+.continueBtn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.continueBtn:active {
+    /* box-shadow: 0 0 0 0 black; */
+    transform: scale(0.94);
+}
+
+.dayEmphasis {
+    font-style: italic;
+}
+
+.day {
+    font-family: "IBM Plex Serif", sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+}
+
+.days {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.summaryWrapper {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    /*gap: 24px;*/
+}
+
+.daysFooter {
+    padding: 12px 0;
+}
+
+.summaryFooter {
+    padding: 12px 0;
+}
