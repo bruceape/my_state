@@ -2,11 +2,18 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strings"
+	"web-api/handlers"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/joho/godotenv"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +102,24 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Make .env optional; ignore missing file
+	_ = godotenv.Load()
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+
+	db, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to DB: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
 	port := ":8080"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := http.Get("http://example.com/")
@@ -117,6 +142,30 @@ func main() {
 
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/llm", checkinHandler)
+
+	// Auth endpoints
+	authHandler := handlers.NewAuthHander(db)
+	http.HandleFunc("/api/register", authHandler.Register)
+	http.HandleFunc("/api/login", authHandler.Login)
+
+	// Requires login
+	http.HandleFunc("/api/profile", func(w http.ResponseWriter, r *http.Request) {
+		item := r.Header["Authorization"]
+
+		newStr, _ := strings.CutPrefix(item[0], "Bearer ")
+		log.Println(newStr)
+		claims, _ := handlers.ValidateToken(newStr, handlers.Secret)
+		log.Println(claims)
+		if claims.Email != "bruceape@gmail.com" {
+			log.Println("You're NOT allowed")
+			return
+		}
+
+		log.Println("You're allowed")
+		// If authentication token is legit
+		// And we're authorizated to do this
+		// We may continue
+	})
 
 	log.Printf("Server started on port %s", port)
 	http.ListenAndServe(port, nil)
