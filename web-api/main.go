@@ -150,7 +150,7 @@ func main() {
 	http.HandleFunc("/llm", checkinHandler)
 
 	// Auth endpoints
-	authHandler := handlers.NewAuthHander(db, secret, issuer)
+	authHandler := handlers.NewAuthHandler(db, secret, issuer)
 	http.HandleFunc("/api/register", authHandler.Register)
 	http.HandleFunc("/api/login", authHandler.Login)
 

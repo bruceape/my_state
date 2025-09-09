@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 	"web-api/models"
@@ -81,7 +82,7 @@ type AuthHandler struct {
 	cfg            AuthConfig
 }
 
-func NewAuthHander(db *sql.DB, secret string, issuer string) *AuthHandler {
+func NewAuthHandler(db *sql.DB, secret string, issuer string) *AuthHandler {
 	return &AuthHandler{
 		userRepository: *models.NewUserRepository(db),
 		cfg:            AuthConfig{Secret: secret, Issuer: issuer, TTL: 15 * time.Minute},
@@ -117,8 +118,13 @@ func (auth *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(request.Password) < 8 || len(request.Password) > 24 {
-		WriteError(w, http.StatusBadRequest, "invalid password, must be between 8 and 24 characters.")
+	if !IsValidEmail(strings.ToLower(request.Email)) {
+		WriteError(w, http.StatusBadRequest, "invalid email.")
+		return
+	}
+
+	if err := ValidatePassword(request.Password); err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -200,4 +206,44 @@ func (auth *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Token: token,
 	}
 	WriteJSON(w, http.StatusOK, res)
+}
+
+func IsValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func ValidatePassword(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters")
+	}
+
+	hasUpper := false
+	hasLower := false
+	hasNumber := false
+	hasSpecial := false
+
+	for _, char := range password {
+		switch {
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case '0' <= char && char <= '9':
+			hasNumber = true
+		case char == '!' || char == '@' || char == '#' || char == '$' ||
+			char == '%' || char == '^' || char == '&' || char == '*':
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper || !hasLower || !hasNumber || !hasSpecial {
+		return errors.New("password must contain uppercase, lowercase, numbers, and special characters.")
+	}
+
+	if len(password) > 32 {
+		return errors.New("password must be less than 32 characters")
+	}
+
+	return nil
 }
