@@ -138,7 +138,7 @@ func (auth *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Email:        strings.ToLower(request.Email),
 		PasswordHash: hashedPassword,
 	}
-	if err := auth.userRepository.CreateUser(&user); err != nil {
+	if err := auth.userRepository.CreateUser(r.Context(), &user); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case errors.Is(err, models.ErrUserExists):
@@ -185,7 +185,7 @@ func (auth *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.userRepository.FindUserByEmail(strings.ToLower(request.Email))
+	user, err := auth.userRepository.FindUserByEmail(r.Context(), strings.ToLower(request.Email))
 	if err != nil {
 		WriteError(w, http.StatusUnauthorized, "user not found")
 		return

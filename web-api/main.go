@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 	"web-api/handlers"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -34,6 +36,10 @@ type Response struct {
 }
 
 func checkinHandler(w http.ResponseWriter, r *http.Request) {
+	// Create context with timeout for external API call
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
 	url := "https://api.openai.com/v1/responses"
 
 	payload := map[string]any{
@@ -55,9 +61,10 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create request
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	// Create request with context
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
 
@@ -121,6 +128,12 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 	defer db.Close()
+
+	// Configure connection pool for production
+	db.SetMaxOpenConns(25)                 // max concurrent connections
+	db.SetMaxIdleConns(5)                  // max idle connections in pool
+	db.SetConnMaxLifetime(5 * time.Minute) // max time a connection can be reused
+	db.SetConnMaxIdleTime(1 * time.Minute) // max time a connection can be idle
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
