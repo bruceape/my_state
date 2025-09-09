@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"web-api/handlers"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -62,7 +61,7 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := "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"
+	apiKey := os.Getenv("OPENAI_API_KEY")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
@@ -76,7 +75,7 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
-	// get body
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
@@ -93,7 +92,8 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 
 	var data map[string]any
 	if err := json.Unmarshal([]byte(jsonText), &data); err != nil {
-		log.Fatal("bad json:", err)
+		http.Error(w, "bad upstream response", http.StatusBadGateway)
+		return
 	}
 
 	out, _ := json.MarshalIndent(data, "", "  ")
@@ -104,6 +104,12 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Make .env optional; ignore missing file
 	_ = godotenv.Load()
+
+	secret := os.Getenv("JWT_SECRET")
+	issuer := os.Getenv("JWT_ISSUER")
+	if secret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -144,28 +150,14 @@ func main() {
 	http.HandleFunc("/llm", checkinHandler)
 
 	// Auth endpoints
-	authHandler := handlers.NewAuthHander(db)
+	authHandler := handlers.NewAuthHander(db, secret, issuer)
 	http.HandleFunc("/api/register", authHandler.Register)
 	http.HandleFunc("/api/login", authHandler.Login)
 
-	// Requires login
-	http.HandleFunc("/api/profile", func(w http.ResponseWriter, r *http.Request) {
-		item := r.Header["Authorization"]
-
-		newStr, _ := strings.CutPrefix(item[0], "Bearer ")
-		log.Println(newStr)
-		claims, _ := handlers.ValidateToken(newStr, handlers.Secret)
-		log.Println(claims)
-		if claims.Email != "bruceape@gmail.com" {
-			log.Println("You're NOT allowed")
-			return
-		}
-
-		log.Println("You're allowed")
-		// If authentication token is legit
-		// And we're authorizated to do this
-		// We may continue
-	})
+	// Requires login (use auth middleware)
+	http.Handle("/api/profile", authHandler.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.WriteJSON(w, http.StatusOK, map[string]string{"you": "are in!"})
+	})))
 
 	log.Printf("Server started on port %s", port)
 	http.ListenAndServe(port, nil)

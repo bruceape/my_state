@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type User struct {
@@ -27,7 +29,18 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 var createUserQuery string
 
 func (r *UserRepository) CreateUser(user *User) error {
-	err := r.db.QueryRow(createUserQuery, user.Email, user.PasswordHash).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	err := r.db.QueryRow(createUserQuery, user.Email, user.PasswordHash).
+		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23505" {
+			return ErrUserExists
+		}
+	}
 
 	return err
 }
@@ -37,11 +50,15 @@ var findUserByEmailQuery string
 
 func (r *UserRepository) FindUserByEmail(email string) (*User, error) {
 	user := &User{}
-	err := r.db.QueryRow(findUserByEmailQuery, email).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		return nil, errors.New("user not found")
+	err := r.db.QueryRow(findUserByEmailQuery, email).
+		Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err == nil {
+		return user, nil
 	}
 
-	return user, err
+	if err == sql.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+
+	return nil, err
 }
