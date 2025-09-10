@@ -172,6 +172,17 @@ func main() {
 		handlers.WriteJSON(w, http.StatusOK, map[string]string{"you": "are in!"})
 	})))
 
+	srv := &http.Server{
+		Addr:              port,
+		Handler:           nil, // use default mux
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("Server started on port %s", port)
-	http.ListenAndServe(port, nil)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("server error: %v", err)
+	}
 }

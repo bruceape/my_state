@@ -187,13 +187,13 @@ func (auth *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := auth.userRepository.FindUserByEmail(r.Context(), strings.ToLower(request.Email))
 	if err != nil {
-		WriteError(w, http.StatusUnauthorized, "user not found")
+		WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	correctPass := CheckPassword(user.PasswordHash, request.Password)
 	if !correctPass {
-		WriteError(w, http.StatusUnauthorized, "incorrect password")
+		WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
