@@ -1,5 +1,5 @@
 # API
-Exists as a basic gateway to LLMs. Will have a hand rolled auth system that a client can authenticate against.
+Exists as a basic gateway to LLMs. Contains hand rolled auth system that a client can authenticate against.
 
 ## Usage
 ### Requirements
@@ -8,10 +8,13 @@ Exists as a basic gateway to LLMs. Will have a hand rolled auth system that a cl
 
 ### Environment Variables
 Expects a the following environment variables to be set.
-- OPENAI_API_KEY
-- OPENAI_PROJECT_ID
-- OPENAI_ORG_ID
-- DATABASE_URL
+- OPENAI_API_KEY=""
+- OPENAI_PROJECT_ID=""
+- OPENAI_ORG_ID=""
+- DATABASE_URL=""
+- JWT_SECRET=""
+- JWT_TTL=15m
+
 
 ### Setup
 To run, simply run `go run .` in the root directory.
@@ -40,3 +43,6 @@ Runs all migrations in the `db/migrations` folder that haven't been applied yet,
 ```
 go run ./cmd/migrations/run
 ```
+
+## Testing Tools
+I've included a few bash scripts to manually test the endpoints. I'm sure there's a better way to manually test these. They are available in `testing_tools`
