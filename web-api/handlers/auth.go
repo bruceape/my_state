@@ -56,13 +56,16 @@ func GenerateToken(id string, email string, secret string, issuer string, expira
 }
 
 func ValidateToken(tokenString string, secret string, issuer string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("invalid signing method")
-		}
-		return []byte(secret), nil
-	})
-
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&Claims{},
+		func(t *jwt.Token) (any, error) {
+			return []byte(secret), nil
+		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(issuer),
+		jwt.WithLeeway(1*time.Minute),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +73,6 @@ func ValidateToken(tokenString string, secret string, issuer string) (*Claims, e
 	if !ok || !token.Valid {
 		return nil, errors.New("invalid token")
 	}
-	if issuer != "" && claims.Issuer != issuer {
-		return nil, errors.New("invalid issuer")
-	}
-
 	return claims, nil
 }
 
@@ -82,10 +81,10 @@ type AuthHandler struct {
 	cfg            AuthConfig
 }
 
-func NewAuthHandler(db *sql.DB, secret string, issuer string) *AuthHandler {
+func NewAuthHandler(db *sql.DB, secret string, issuer string, ttl time.Duration) *AuthHandler {
 	return &AuthHandler{
 		userRepository: *models.NewUserRepository(db),
-		cfg:            AuthConfig{Secret: secret, Issuer: issuer, TTL: 15 * time.Minute},
+		cfg:            AuthConfig{Secret: secret, Issuer: issuer, TTL: ttl},
 	}
 }
 
@@ -118,7 +117,8 @@ func (auth *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !IsValidEmail(strings.ToLower(request.Email)) {
+	email := strings.Trim(strings.ToLower(request.Email), " ")
+	if !IsValidEmail(email) {
 		WriteError(w, http.StatusBadRequest, "invalid email.")
 		return
 	}
@@ -135,11 +135,10 @@ func (auth *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := models.User{
-		Email:        strings.ToLower(request.Email),
+		Email:        email,
 		PasswordHash: hashedPassword,
 	}
 	if err := auth.userRepository.CreateUser(r.Context(), &user); err != nil {
-		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case errors.Is(err, models.ErrUserExists):
 			WriteError(w, http.StatusConflict, "email already exists") // 409
@@ -185,7 +184,8 @@ func (auth *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.userRepository.FindUserByEmail(r.Context(), strings.ToLower(request.Email))
+	email := strings.Trim(strings.ToLower(request.Email), " ")
+	user, err := auth.userRepository.FindUserByEmail(r.Context(), email)
 	if err != nil {
 		WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
@@ -209,13 +209,18 @@ func (auth *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func IsValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
+	email = strings.TrimSpace(email)
+	addr, err := mail.ParseAddress(email)
+	return err == nil && addr.Address == email
 }
 
 func ValidatePassword(password string) error {
 	if len(password) < 8 {
 		return errors.New("password must be at least 8 characters")
+	}
+
+	if len(password) > 128 {
+		return errors.New("password must be less than 128 characters")
 	}
 
 	hasUpper := false
@@ -239,10 +244,6 @@ func ValidatePassword(password string) error {
 
 	if !hasUpper || !hasLower || !hasNumber || !hasSpecial {
 		return errors.New("password must contain uppercase, lowercase, numbers, and special characters.")
-	}
-
-	if len(password) > 32 {
-		return errors.New("password must be less than 32 characters")
 	}
 
 	return nil

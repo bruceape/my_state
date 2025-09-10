@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 	"web-api/handlers"
 
@@ -113,10 +114,44 @@ func main() {
 	_ = godotenv.Load()
 
 	secret := os.Getenv("JWT_SECRET")
-	issuer := os.Getenv("JWT_ISSUER")
 	if secret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
+	const (
+		defaultTTL = 15 * time.Minute
+		minTTL     = 1 * time.Minute
+		maxTTL     = 24 * time.Hour
+	)
+	ttl := defaultTTL
+
+	if v := os.Getenv("JWT_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err != nil {
+			log.Printf("Invalid JWT_TTL %q: %v; falling back to JWT_TTL_MINUTES/default", v, err)
+		} else {
+			ttl = d
+		}
+	}
+	if ttl == defaultTTL {
+		if v := os.Getenv("JWT_TTL_MINUTES"); v != "" {
+			if n, err := strconv.ParseInt(v, 10, 64); err != nil {
+				log.Printf("Invalid JWT_TTL_MINUTES %q: %v; using default %v", v, err, defaultTTL)
+			} else {
+				ttl = time.Duration(n) * time.Minute
+			}
+		}
+	}
+
+	if ttl < minTTL {
+		log.Printf("JWT TTL too small (%v); clamping to %v", ttl, minTTL)
+		ttl = minTTL
+	}
+	if ttl > maxTTL {
+		log.Printf("JWT TTL too large (%v); clamping to %v", ttl, maxTTL)
+		ttl = maxTTL
+	}
+
+	log.Printf("JWT TTL: %v", ttl)
+	issuer := os.Getenv("JWT_ISSUER")
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -163,7 +198,7 @@ func main() {
 	http.HandleFunc("/llm", checkinHandler)
 
 	// Auth endpoints
-	authHandler := handlers.NewAuthHandler(db, secret, issuer)
+	authHandler := handlers.NewAuthHandler(db, secret, issuer, ttl)
 	http.HandleFunc("/api/register", authHandler.Register)
 	http.HandleFunc("/api/login", authHandler.Login)
 
