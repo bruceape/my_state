@@ -7,7 +7,7 @@ Exists as a basic gateway to LLMs. Contains hand rolled auth system that a clien
 - Postgres DB
 
 ### Environment Variables
-Expects a the following environment variables to be set.
+Expects the following environment variables to be set.
 - OPENAI_API_KEY=""
 - OPENAI_PROJECT_ID=""
 - OPENAI_ORG_ID=""
