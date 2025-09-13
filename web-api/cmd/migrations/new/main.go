@@ -24,7 +24,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not create file %s: %v", fileName, err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+	}()
+	if err != nil {
+		log.Fatalf("Failed to close file %v", err)
+	}
 
 	fmt.Println("File created:", file.Name())
 

@@ -1,4 +1,5 @@
 BEGIN;
+-- Creates the initial migrations table. We'll use this to track which migrations have been applied over time.
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY,

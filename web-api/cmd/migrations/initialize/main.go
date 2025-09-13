@@ -14,7 +14,6 @@ import (
 var addMigrationsTable string
 
 func main() {
-	// Make .env optional; ignore missing file
 	_ = godotenv.Load()
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -26,7 +25,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+	}()
+	if err != nil {
+		log.Fatalf("Failed to close DB: %v", err)
+	}
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
