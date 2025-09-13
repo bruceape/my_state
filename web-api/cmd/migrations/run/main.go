@@ -24,6 +24,8 @@ type Migration struct {
 	SQL      string
 }
 
+// A helper to apply a specific migration.
+// We do the entire migration in a transaction, so we don't apply it without also recording it in the applied table.
 func ApplyMigration(ctx context.Context, conn *sql.Conn, migration Migration) error {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -45,9 +47,11 @@ func ApplyMigration(ctx context.Context, conn *sql.Conn, migration Migration) er
 	return nil
 }
 
+// A helper to load the migration files from disk.
 func LoadMigrations() ([]Migration, error) {
 	var migrations []Migration
 
+	// We take no risks here...if the directory doesn't exist, we bail and just return empty.
 	if _, err := os.Stat("db/migrations"); err != nil {
 		if os.IsNotExist(err) {
 			return []Migration{}, nil
@@ -91,6 +95,7 @@ func LoadMigrations() ([]Migration, error) {
 		return nil, err
 	}
 
+	// We sort by version number (which should be date). Doing this hopefully applies the migrations in an ideal order (though it is possible, due to the relative nature of time, for these things to get out sync)
 	sort.Slice(migrations, func(i, j int) bool {
 		return migrations[i].Version < migrations[j].Version
 	})
@@ -98,6 +103,8 @@ func LoadMigrations() ([]Migration, error) {
 	return migrations, nil
 }
 
+// A helped to fetch the applied migrations.
+// We fetch what has been applied in the DB, and store it as a map.
 func GetAppliedMigrations(ctx context.Context, conn *sql.Conn) (map[string]time.Time, error) {
 	rows, err := conn.QueryContext(ctx, getMigrations)
 	if err != nil {
@@ -121,6 +128,8 @@ func GetAppliedMigrations(ctx context.Context, conn *sql.Conn) (map[string]time.
 
 	return appliedMigrations, nil
 }
+
+// A helper to create an advisory lock.
 func AcquireAdvisoryLock(ctx context.Context, conn *sql.Conn, lockID int64) error {
 	var acquired bool
 	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired); err != nil {
@@ -132,6 +141,7 @@ func AcquireAdvisoryLock(ctx context.Context, conn *sql.Conn, lockID int64) erro
 	return nil
 }
 
+// A helper to release an advisory lock.
 func ReleaseAdvisoryLock(ctx context.Context, conn *sql.Conn, lockID int64) error {
 	var released bool
 	if err := conn.QueryRowContext(ctx, "SELECT pg_advisory_unlock($1)", lockID).Scan(&released); err != nil {
@@ -151,6 +161,7 @@ var getMigrations string
 
 func Run(ctx context.Context, conn *sql.Conn) error {
 	// Lock
+	// We lock the DB here, JUST IN CASE we have two migrations running at the same time
 	lockID := int64(42069)
 	if err := AcquireAdvisoryLock(ctx, conn, lockID); err != nil {
 		return fmt.Errorf("acquire migration lock: %w", err)
@@ -162,18 +173,22 @@ func Run(ctx context.Context, conn *sql.Conn) error {
 	}()
 
 	// Load migration files
+	// Next, we load the migration files from `db/migrations`
 	migrations, err := LoadMigrations()
 	if err != nil {
 		return fmt.Errorf("load migrations: %w", err)
 	}
 
 	// Get applied migrations
+	// We also make a trip to the DB, to see what we've already applied.
+	// We want migrations to be idempotent when possible, but it's not a guarantee.
 	appliedMigrations, err := GetAppliedMigrations(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("get applied migrations: %w", err)
 	}
 
 	// Apply pending migrations
+	// If a migration hasn't been applied yet, we go for it.
 	for _, migration := range migrations {
 		if _, exists := appliedMigrations[migration.Version]; exists {
 			log.Printf("Migration %s already applied, skipping", migration.Version)
@@ -202,7 +217,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Fatalf("Failed to close DB: %v", err)
+		}
+	}()
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
@@ -215,7 +235,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to acquire DB connection: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Fatalf("Failed to close connection to DB: %v", err)
+		}
+	}()
 
 	if err := Run(ctx, conn); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
