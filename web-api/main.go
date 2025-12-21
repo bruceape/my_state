@@ -32,14 +32,14 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 
 	payload := map[string]any{
 		"prompt": map[string]any{
-			"id": "pmpt_68b2181fe7348190a88a27ac360085a2045165832abddf4a",
+			"id": "",
 			"variables": map[string]string{
-				"yesterday_intent":    "I wanted to learn about AI for the render SRE projectI",
-				"yesterday_completed": "I read a chapter in the O'Reilly AI book",
-				"yesterday_friction":  "None",
-				"today_intent":        "Getting this AI manager working",
-				"today_questions":     "Nope",
-				"big_picture":         "I'd like to be more autonomous ",
+				"yesterday_intent":    "",
+				"yesterday_completed": "",
+				"yesterday_friction":  "",
+				"today_intent":        "",
+				"today_questions":     "",
+				"big_picture":         "",
 			},
 		},
 	}
