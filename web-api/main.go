@@ -55,7 +55,7 @@ func checkinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := "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"
+	apiKey := ""
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
